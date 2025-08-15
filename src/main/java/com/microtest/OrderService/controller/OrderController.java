@@ -28,6 +28,7 @@ public class OrderController {
     @PostMapping("/{productId}/feign0")
     public String createPayment(@PathVariable String productId) {
         return payment0Service.createPayment(productId);
+        
     }
 
 }
