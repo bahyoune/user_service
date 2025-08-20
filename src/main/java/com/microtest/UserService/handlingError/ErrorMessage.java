@@ -1,4 +1,4 @@
-package com.microtest.OrderService.handlingError;
+package com.microtest.UserService.handlingError;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

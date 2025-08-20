@@ -1,4 +1,4 @@
-package com.microtest.OrderService.config;
+package com.microtest.UserService.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

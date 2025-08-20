@@ -1,10 +1,10 @@
-package com.microtest.OrderService.enums;
+package com.microtest.UserService.enums;
 
 public enum ROLE_ENUM {
     ADMIN,
     MANAGER_1,
     MANAGER_2,
-    STAFF_1,
+    USER,
     STAFF_2
 
 }

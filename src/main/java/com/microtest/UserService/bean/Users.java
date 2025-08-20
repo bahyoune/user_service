@@ -1,6 +1,6 @@
-package com.microtest.OrderService.bean;
+package com.microtest.UserService.bean;
 
-import com.microtest.OrderService.enums.ROLE_ENUM;
+import com.microtest.UserService.enums.ROLE_ENUM;
 import jakarta.persistence.*;
 import lombok.Builder;
 import lombok.Data;
@@ -8,7 +8,7 @@ import lombok.Data;
 import java.util.Date;
 
 @Data
-@Builder
+//@Builder
 @Entity
 @Table(name = "USERS")
 public class Users {
@@ -38,4 +38,12 @@ public class Users {
 
     @Temporal(TemporalType.TIMESTAMP)
     private Date d0;
+
+    public Users() {
+    }
+
+    public Users(Long id) {
+        this.id = id;
+    }
+
 }

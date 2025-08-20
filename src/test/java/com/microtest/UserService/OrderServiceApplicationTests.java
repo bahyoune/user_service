@@ -1,4 +1,4 @@
-package com.microtest.OrderService;
+package com.microtest.UserService;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
