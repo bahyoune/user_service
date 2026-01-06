@@ -63,6 +63,8 @@ public class AuthController {
             DisabledException, UsernameNotFoundException{
 
         try {
+            System.out.println("enter");
+            System.out.println("-----------------");
             authenticationManager
                     .authenticate(new
                             UsernamePasswordAuthenticationToken(auth.getUsername().toLowerCase(),
