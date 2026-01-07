@@ -15,7 +15,7 @@ import java.util.Date;
 @Component
 public class JwtUtil {
 
-    @Value("${jwt.access.secret}")
+    @Value("${spring.security.oauth2.resourceserver.jwt.secret-key}")
     private String accessSecret;
     @Value("${jwt.refresh.secret}")
     private String refreshSecret;
