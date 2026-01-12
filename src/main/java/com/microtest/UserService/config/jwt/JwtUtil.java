@@ -1,16 +1,14 @@
 package com.microtest.UserService.config.jwt;
 
 
-//import java.security.Key;
 
 import io.jsonwebtoken.*;
-import io.jsonwebtoken.io.Decoders;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import java.util.Date;
+import java.util.List;
 
 @Component
 public class JwtUtil {
@@ -47,10 +45,6 @@ public class JwtUtil {
     //</editor-fold>
 
     //<editor-fold defaultState="collapsed" desc="Is Valid jwt">
-    public boolean isAccessValid(String jwt) {
-        return isValid(jwt, true);
-    }
-
     public boolean isRefreshValid(String jwt) {
         return isValid(jwt, false);
     }
@@ -87,10 +81,10 @@ public class JwtUtil {
         Date now = new Date();
         return Jwts.builder()
                 .setSubject(userId)
-                .claim("role", role)
+                .claim("roles", List.of("ROLE_" + role))
                 .setIssuedAt(now)
                 .setExpiration(new Date(now.getTime() + accessExp * 1000))
-                .signWith(SignatureAlgorithm.HS256, getSignKey_access())
+                .signWith(getSignKey_access(), SignatureAlgorithm.HS256)
                 .compact();
     }
 
@@ -102,7 +96,7 @@ public class JwtUtil {
                 .setId(tokenId)
                 .setIssuedAt(now)
                 .setExpiration(new Date(now.getTime() + refreshExp * 1000))
-                .signWith(SignatureAlgorithm.HS256, getSignKey_refresh())
+                .signWith(getSignKey_refresh(), SignatureAlgorithm.HS256)
                 .compact();
     }
     //</editor-fold>
@@ -110,13 +104,18 @@ public class JwtUtil {
 
     //<editor-fold defaultState="collapsed" desc="Key Secret">
     private SecretKey getSignKey_access() {
-        byte[] keyBytes = Decoders.BASE64.decode(accessSecret);
-        return new SecretKeySpec(keyBytes, (SignatureAlgorithm.HS256).getJcaName());
+        return new SecretKeySpec(
+                accessSecret.getBytes(),
+                "HmacSHA256"
+        );
+
     }
 
     private SecretKey getSignKey_refresh() {
-        byte[] keyBytes = Decoders.BASE64.decode(refreshSecret);
-        return new SecretKeySpec(keyBytes, (SignatureAlgorithm.HS256).getJcaName());
+        return new SecretKeySpec(
+                refreshSecret.getBytes(),
+                "HmacSHA256"
+        );
     }
     //</editor-fold>
 

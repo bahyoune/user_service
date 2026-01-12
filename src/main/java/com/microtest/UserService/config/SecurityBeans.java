@@ -8,10 +8,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
-import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.security.oauth2.jwt.JwtEncoder;
-import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
-import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
+import org.springframework.security.oauth2.jwt.*;
 
 
 import javax.crypto.SecretKey;
@@ -28,22 +25,11 @@ public class SecurityBeans {
         return new BCryptPasswordEncoder();
     }
 
-    private SecretKey secretKey() {
-        return new SecretKeySpec(
-                secret.getBytes(),
-                "HmacSHA256"
-        );
-    }
-
     @Bean
-    public JwtEncoder jwtEncoder() {
-        return new NimbusJwtEncoder(new ImmutableSecret<>(secretKey()));
-    }
-
-    @Bean
-    public JwtDecoder jwtDecoder() {
+    JwtDecoder jwtDecoder() {
+        SecretKey key = new SecretKeySpec(secret.getBytes(), "HmacSHA256");
         return NimbusJwtDecoder
-                .withSecretKey(secretKey())
+                .withSecretKey(key)
                 .macAlgorithm(MacAlgorithm.HS256)
                 .build();
     }
