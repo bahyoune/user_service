@@ -21,10 +21,6 @@ public class AuthServiceImpl implements AuthService {
     private UsersRepository userRepository;
 
 
-    @Autowired
-    private PasswordEncoder passwordEncoder;
-
-
     @Override
     public Long getAdminID(String email) {
         Optional<Users> user = userRepository.findFirstByEmailOrLogin(email);
@@ -40,14 +36,13 @@ public class AuthServiceImpl implements AuthService {
 
         if (!hasUserWithEmailOrLogin(data.getEmail(), data.getLogin())) {
             Users user = new Users();
-                    user.setEmail(data.getEmail().toLowerCase());
-                    user.setLogin(data.getLogin().toLowerCase());
-                    user.setRole(getRole(data.getRole()));
-                    user.setState(true);
-                    user.setFullName(data.getFullName());
-                    user.setD0(new Date());
-                    user.setPassword(new BCryptPasswordEncoder().encode(data.getPassword()));
-
+            user.setEmail(data.getEmail().toLowerCase());
+            user.setLogin(data.getLogin().toLowerCase());
+            user.setRole(getRole(data.getRole()));
+            user.setState(true);
+            user.setFullName(data.getFullName());
+            user.setD0(new Date());
+            user.setPassword(new BCryptPasswordEncoder().encode(data.getPassword()));
 
 
             user = userRepository.save(user);
@@ -61,14 +56,11 @@ public class AuthServiceImpl implements AuthService {
     }
 
     private ROLE_ENUM getRole(int role) {
-        switch (role) {
-            case 0:
-                return ROLE_ENUM.ADMIN;
-            case 3:
-                return ROLE_ENUM.USER;
-            default:
-                return ROLE_ENUM.MANAGER_1;
-        }
+        return switch (role) {
+            case 0 -> ROLE_ENUM.ADMIN;
+            case 3 -> ROLE_ENUM.USER;
+            default -> ROLE_ENUM.MANAGER_1;
+        };
     }
 
     private Boolean hasUserWithEmailOrLogin(String email, String login) {

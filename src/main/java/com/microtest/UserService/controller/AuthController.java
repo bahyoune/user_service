@@ -77,6 +77,7 @@ public class AuthController {
 
         final UserDetails userDetails = userDetailsService.
                 loadUserByUsername(auth.getUsername().toLowerCase());
+
         Optional<Users> optionalUser = userRepository.findFirstByEmailOrLogin(userDetails.getUsername());
         Users user = optionalUser.get();
 
