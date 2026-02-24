@@ -7,6 +7,4 @@ public interface AuthService {
 
     SignupRequest createUser(SignupRequest data);
 
-    Long getAdminID(String email);
-
 }

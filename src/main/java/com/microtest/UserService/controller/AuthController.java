@@ -78,21 +78,27 @@ public class AuthController {
         final UserDetails userDetails = userDetailsService.
                 loadUserByUsername(auth.getUsername().toLowerCase());
 
-        Optional<Users> optionalUser = userRepository.findFirstByEmailOrLogin(userDetails.getUsername());
-        Users user = optionalUser.get();
+        Optional<Users> optionalUser = userRepository.findByEmailOrLogin(userDetails.getUsername(),userDetails.getUsername());
 
-        // issue refresh (jti tracked), then access
-        Instant refExp = Instant.now().plusSeconds( jwtRefreshSeconds );
-        String jti = store.issue(auth.getUsername(), refExp);
-        String refreshToken = jwt.generateRefreshToken(auth.getUsername(), jti);
-        String accessToken  = jwt.generateAccessToken(auth.getUsername(), user.getRole().toString());
+        if (optionalUser.isPresent()) {
+            Users user = optionalUser.get();
 
-        return ResponseEntity.ok(Map.of(
-                "accessToken", accessToken,
-                "refreshToken", refreshToken,
-                "tokenType", "Bearer",
-                "expiresIn", jwtAccessSeconds
-        ));
+            // issue refresh (jti tracked), then access
+            Instant refExp = Instant.now().plusSeconds( jwtRefreshSeconds );
+            String jti = store.issue(auth.getUsername(), refExp);
+            String refreshToken = jwt.generateRefreshToken(auth.getUsername(), jti);
+            String accessToken  = jwt.generateAccessToken(auth.getUsername(), user.getRole().toString());
+
+            return ResponseEntity.ok(Map.of(
+                    "accessToken", accessToken,
+                    "refreshToken", refreshToken,
+                    "tokenType", "Bearer",
+                    "expiresIn", jwtAccessSeconds
+            ));
+        }
+
+
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Bad Credentials"));
     }
 
     @PostMapping("/refresh")
@@ -116,16 +122,21 @@ public class AuthController {
         // access token (role could be looked up again; here we reuse previous role or re-query)
         final UserDetails userDetails = userDetailsService.
                 loadUserByUsername(userId);
-        Optional<Users> optionalUser = userRepository.findFirstByEmailOrLogin(userDetails.getUsername());
-        Users user = optionalUser.get();
-        String newAccess = jwt.generateAccessToken(userId, user.getRole().toString());
+        Optional<Users> optionalUser = userRepository.findByEmailOrLogin(userDetails.getUsername(),userDetails.getUsername());
 
-        return ResponseEntity.ok(Map.of(
-                "accessToken", newAccess,
-                "refreshToken", newRefresh,
-                "tokenType", "Bearer",
-                "expiresIn", jwtAccessSeconds
-        ));
+        if (optionalUser.isPresent()) {
+            Users user = optionalUser.get();
+            String newAccess = jwt.generateAccessToken(userId, user.getRole().toString());
+
+            return ResponseEntity.ok(Map.of(
+                    "accessToken", newAccess,
+                    "refreshToken", newRefresh,
+                    "tokenType", "Bearer",
+                    "expiresIn", jwtAccessSeconds
+            ));
+        }
+
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Bad Credentials"));
     }
 
     @PostMapping("/logout")

@@ -21,17 +21,9 @@ public class AuthServiceImpl implements AuthService {
     private UsersRepository userRepository;
 
 
-    @Override
-    public Long getAdminID(String email) {
-        Optional<Users> user = userRepository.findFirstByEmailOrLogin(email);
-        return user.map(Users::getId).orElse(null);
-    }
-
-
-    //<editor-fold defaultState="collapsed" desc="Find User Admin and Manager">
+    //<editor-fold defaultState="collapsed" desc="Create User">
     @Override
     @Transactional
-    //Admin and Manager
     public SignupRequest createUser(SignupRequest data) {
 
         if (!hasUserWithEmailOrLogin(data.getEmail(), data.getLogin())) {
@@ -47,6 +39,7 @@ public class AuthServiceImpl implements AuthService {
 
             user = userRepository.save(user);
             data.setId(user.getId());
+            data.setPassword("********************");
 
             return data;
         }
@@ -65,8 +58,8 @@ public class AuthServiceImpl implements AuthService {
 
     private Boolean hasUserWithEmailOrLogin(String email, String login) {
 
-        if (userRepository.findEmailUser(email).isPresent()) {
-            return userRepository.findLoginUser(login).isPresent();
+        if (userRepository.findIdByUserEmail(email).isPresent()) {
+            return userRepository.findIdByUserLogin(login).isPresent();
         }
 
         return false;
