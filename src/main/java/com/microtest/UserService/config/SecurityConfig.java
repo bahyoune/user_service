@@ -18,20 +18,18 @@ import org.springframework.security.web.SecurityFilterChain;
 public class SecurityConfig {
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity httpSecurity) throws Exception {
 
-
-        http
+    return     httpSecurity
                 .csrf(AbstractHttpConfigurer::disable) // Disable CSRF for simplicity
                 .authorizeHttpRequests(auth -> auth
                                 .requestMatchers("/auth/**", "/actuator/**").permitAll() // Permit all access to /auth/welcome
                                 .anyRequest().authenticated() // Require authentication for /auth/user/**
                 )
-                .oauth2ResourceServer(o -> o.jwt(Customizer.withDefaults()));
+                .oauth2ResourceServer(o -> o.jwt(Customizer.withDefaults())).build();
 
 
 
-        return http.build();
     }
 
 

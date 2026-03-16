@@ -1,6 +1,7 @@
 package com.microtest.UserService.config;
 
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -32,5 +33,11 @@ public class SecurityBeans {
                 .withSecretKey(key)
                 .macAlgorithm(MacAlgorithm.HS256)
                 .build();
+    }
+
+
+    @Bean
+    public ObjectMapper objectMapper() {
+        return new ObjectMapper();
     }
 }

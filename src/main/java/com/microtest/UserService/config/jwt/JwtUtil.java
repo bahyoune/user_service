@@ -4,23 +4,30 @@ package com.microtest.UserService.config.jwt;
 
 import io.jsonwebtoken.*;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.stereotype.Service;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import java.util.Date;
-import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
-@Component
+@Service
+//@RequiredArgsConstructor
 public class JwtUtil {
 
     @Value("${spring.security.oauth2.resourceserver.jwt.secret-key}")
     private String accessSecret;
+    @Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri}")
+    private String issuer;
     @Value("${jwt.refresh.secret}")
     private String refreshSecret;
     @Value("${jwt.access.expiration}")
     private Long accessExp;
     @Value("${jwt.refresh.expiration}")
     private Long refreshExp;
+
 
 
     //<editor-fold defaultState="collapsed" desc="javax.persistence.OneToMany">
@@ -77,11 +84,21 @@ public class JwtUtil {
     //</editor-fold>
 
     //<editor-fold defaultState="collapsed" desc="GenerateToken">
-    public String generateAccessToken(String userId, String role) {
+    public String generateAccessToken(UserDetails userDetails) {
         Date now = new Date();
+
+        String roles = userDetails.getAuthorities()
+                .stream()
+                .map(GrantedAuthority::getAuthority)
+                .filter(Objects::nonNull)
+                .filter(s -> !s.equals("FACTOR_PASSWORD"))
+                .collect(Collectors.joining(","));
+
+
         return Jwts.builder()
-                .setSubject(userId)
-                .claim("roles", List.of("ROLE_" + role))
+                .setIssuer(issuer)
+                .setSubject(userDetails.getUsername())
+                .claim("roles", roles)
                 .setIssuedAt(now)
                 .setExpiration(new Date(now.getTime() + accessExp * 1000))
                 .signWith(getSignKey_access(), SignatureAlgorithm.HS256)

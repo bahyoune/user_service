@@ -1,298 +1,667 @@
-# User Service (Authentication & Authorization)
+# User Service — Authentication & Identity (v3)
 
-The **User Service** is responsible for **user identity management and authentication**.
+> Cloud-native authentication microservice responsible for user registration, login, JWT access token generation, refresh token lifecycle, logout/token revocation, and role-based access control.
 
-It provides:
-
-* User and role management
-* Secure credential storage
-* JWT access token generation
-* Refresh token support
-* Authentication endpoints used by the API Gateway
-
-This service acts as the **identity provider** of the platform.
+![Java](https://img.shields.io/badge/Java-17+-orange)
+![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.x-brightgreen)
+![Spring Security](https://img.shields.io/badge/Spring%20Security-JWT-success)
+![Architecture](https://img.shields.io/badge/Architecture-Microservices-blue)
+![Tests](https://img.shields.io/badge/Tests-Repository%20%7C%20Unit%20%7C%20Slice%20%7C%20Integration-informational)
+![Observability](https://img.shields.io/badge/Observability-OpenTelemetry-purple)
+![Docker](https://img.shields.io/badge/Docker-Supported-2496ED)
 
 ---
 
-## Responsibilities
+## Table of Contents
 
-The User Service handles:
-
-* User registration
-* Role creation and assignment
-* Authentication (login)
-* JWT access token generation
-* Refresh token issuance & rotation
-* Credential security
-
-All authentication logic is centralized here.
-
----
-
-## Security Model
-
-### Overview
-
-The platform uses a **JWT-based authentication model**:
-
-* **Access Token**
-
-  * Short-lived
-  * Sent with every API request
-* **Refresh Token**
-
-  * Long-lived
-  * Used to obtain new access tokens
-  * Never sent to business services
-
-The API Gateway validates access tokens before routing requests.
+- [Overview](#overview)
+- [Key Features](#key-features)
+- [Architecture Role](#architecture-role)
+- [Authentication Flow](#authentication-flow)
+- [Tech Stack](#tech-stack)
+- [Project Structure](#project-structure)
+- [Domain Model](#domain-model)
+- [API Endpoints](#api-endpoints)
+- [Validation \& Error Handling](#validation--error-handling)
+- [Security Design](#security-design)
+- [Configuration](#configuration)
+- [Run Locally](#run-locally)
+- [Run with Docker](#run-with-docker)
+- [Testing Strategy](#testing-strategy)
+- [Observability](#observability)
+- [Version History](#version-history)
+- [Roadmap](#roadmap)
+- [Author](#author)
 
 ---
 
-### Authentication Flow
+## Overview
 
-```
+The **User Service** is the authentication and identity provider of the platform.
+
+It centralizes:
+
+- user signup
+- login
+- JWT access token generation
+- refresh token management
+- logout / token revocation
+- role assignment
+- credential validation
+- secure password storage
+
+This microservice is part of **Cloud Native Architecture v3** and is designed to integrate with:
+
+- **Config Server**
+- **Service Discovery**
+- **API Gateway**
+- **Relational Database**
+- **Observability stack**
+
+Its main goal is to provide a **secure, centralized, and scalable authentication layer** for the entire microservice ecosystem.
+
+---
+
+## Key Features
+
+- User signup with role assignment
+- Login with access token and refresh token generation
+- Refresh token flow
+- Logout with token revocation support
+- JWT generation based on `UserDetails`
+- Password encryption with BCrypt
+- Validation for unique login and email
+- Custom business exceptions
+- Role-based security model with `Role_Enum`
+- Builder-based user entity construction
+- Repository, unit, slice, and integration test coverage
+- Dockerized execution support
+
+---
+
+## Architecture Role
+
+This service acts as the **Identity Provider** of the platform.
+
+### Responsibilities
+
+- Register users
+- Authenticate credentials
+- Generate access tokens
+- Manage refresh tokens
+- Revoke tokens on logout
+- Expose identity and roles to the platform
+- Support secure routing through the API Gateway
+
+### Position in the system
+
+```text
 Client
-  ↓ (credentials)
-User Service
-  ↓ (JWT + Refresh Token)
-Client
-  ↓ (JWT)
+  ↓
 API Gateway
   ↓
-Internal Services
+User Service
+  ↓
+Database
+````
+
+The API Gateway uses the access token issued by this service to secure downstream microservices.
+
+---
+
+## Authentication Flow
+
+```text
+Client
+  ↓ (signup / login)
+User Service
+  ↓ (access token + refresh token)
+Client
+  ↓ (access token)
+API Gateway
+  ↓
+Other Microservices
+```
+
+### Token Model
+
+#### Access Token
+
+* JWT-based
+* short-lived
+* contains authenticated user identity and authorities
+* sent in the `Authorization` header
+
+#### Refresh Token
+
+* long-lived
+* used to generate a new access token
+* only exchanged with the User Service
+* can be revoked on logout
+
+---
+
+## Tech Stack
+
+* **Java 17+**
+* **Spring Boot 3.x**
+* **Spring Security**
+* **Spring Data JPA**
+* **JWT**
+* **Maven**
+* **Relational Database** (PostgreSQL / MySQL depending on deployment)
+* **Spring Cloud Config**
+* **Service Discovery**
+* **JUnit 5**
+* **Mockito**
+* **MockMvc**
+* **spring-security-test**
+* **jackson-databind**
+* **Docker**
+
+---
+
+## Project Structure
+
+```text
+src
+ ├── main
+ │   ├── java/com/microtest/UserService
+ │   │   ├── config
+ │   │   │   └── jwt
+ │   │   ├── controller
+ │   │   ├── dto
+ │   │   ├── entity
+ │   │   ├── enums
+ │   │   ├── exception
+ │   │   ├── repository
+ │   │   └── service
+ │   │       └── impl 
+ │   └── resources
+ │       ├── application.yml
+ │       └── bootstrap.yaml
+ │
+ └── test
+     ├── java/com/microtest/UserService
+     │   ├── controller
+     │   ├── integration
+     │   ├── repository
+     │   ├── service
+     │   └── support
+     └── resources
+         └── application-test.yml
 ```
 
 ---
 
-## User & Role Model
+## Domain Model
 
-### User
+### User Entity
 
-* Username / email
-* Encrypted password
-* One or more roles
-* Account status (enabled, locked, etc.)
+A user contains:
 
-### Role
+* login
+* email
+* encrypted password
+* assigned role
+* account-related metadata
 
-* Logical authority (e.g. USER, ADMIN)
-* Used for authorization at the gateway or service level
+### Role Enum
 
----
+The signup contract now uses an enum instead of an integer.
 
-## Token Types
+```java
+public enum RoleEnum {
+    ROLE_USER,
+    ROLE_ADMIN
+}
+```
 
-### Access Token (JWT)
+This improves type safety and readability across the codebase.
 
-* Short-lived (e.g. 15 minutes)
-* Contains:
+### Builder Pattern
 
-  * User identifier
-  * Roles / authorities
-  * Expiration timestamp
-* Sent in `Authorization` header
+The `Users` entity now uses the **Builder pattern** for object construction.
 
-### Refresh Token
+Example:
 
-* Long-lived (e.g. 7 days)
-* Stored securely
-* Used only with the User Service
-* Supports token rotation
+```java
+Users user = Users.builder()
+    .login(request.getLogin())
+    .email(request.getEmail())
+    .password(encodedPassword)
+    .role(request.getRole())
+    .build();
+```
+
+Benefits:
+
+* cleaner construction
+* better maintainability
+* safer domain creation
+* easier unit testing
 
 ---
 
 ## API Endpoints
 
-### Register User
+### Signup
 
 ```http
-POST /auth/register
+POST /auth/signup
 ```
 
-**Request**
+Creates a new user account.
+
+#### Request
 
 ```json
 {
-  "username": "john.doe",
-  "password": "secret",
-  "roles": ["USER"]
+  "login": "john",
+  "email": "john@email.com",
+  "password": "123456",
+  "role": "ROLE_USER" || 0-1
 }
 ```
 
-**Response**
+#### Success Response
 
 ```json
 {
-  "id": "uuid",
-  "username": "john.doe",
-  "roles": ["USER"]
+  "id": 1,
+  "login": "john",
+  "email": "john@email.com",
+  "role": "ROLE_USER"
 }
 ```
 
 ---
 
-### Login (Generate Tokens)
+### Login
 
 ```http
 POST /auth/login
 ```
 
-**Request**
+Authenticates a user and generates a new access token and refresh token.
+
+#### Request
 
 ```json
 {
-  "username": "john.doe",
-  "password": "secret"
+  "login": "john",
+  "password": "123456"
 }
 ```
 
-**Response**
+#### Response
 
 ```json
 {
-  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
-  "refreshToken": "d2b3c9e1-...",
+  "accessToken": "jwt-token",
+  "refreshToken": "refresh-token",
   "expiresIn": 900
 }
 ```
 
 ---
 
-### Refresh Access Token
+### Refresh Token
 
 ```http
 POST /auth/refresh
 ```
 
-**Request**
+Generates a new access token using a valid refresh token.
+
+#### Request
 
 ```json
 {
-  "refreshToken": "d2b3c9e1-..."
+  "refreshToken": "refresh-token"
 }
 ```
 
-**Response**
+#### Response
 
 ```json
 {
-  "accessToken": "new.jwt.token",
+  "accessToken": "new-jwt-token",
+  "refreshToken": "new-refresh-token",
   "expiresIn": 900
 }
 ```
 
 ---
 
-## Password & Token Security
+### Logout / Token Revocation
 
-* Passwords are stored using **BCrypt**
-* Refresh tokens are:
+```http
+POST /auth/logout
+```
 
-  * Stored securely
-  * Rotated on use
-  * Invalidated on logout
-* JWTs are:
+Invalidates or revokes the refresh token so it can no longer be used to generate a new access token.
 
-  * Signed using a secure secret or key pair
-  * Validated by the API Gateway
-
----
-
-## Role-Based Access Control (RBAC)
-
-Roles are embedded in the JWT:
+#### Request
 
 ```json
 {
-  "sub": "john.doe",
-  "roles": ["USER"]
+  "refreshToken": "refresh-token"
 }
 ```
 
-The API Gateway enforces:
+#### Response
 
-* Route-level access
-* Role-based authorization
+```json
+{
+  "message": "Logout successful"
+}
+```
+
+This ensures that a user session can be terminated cleanly from the authentication service.
+
+---
+
+## Validation & Error Handling
+
+The service validates:
+
+* duplicate login
+* duplicate email
+* password minimum length
+
+### Custom Exceptions
+
+#### `LoginOrEmailExistException`
+
+Thrown when a user tries to register with an existing login or email.
+
+#### `IllegalArgumentException`
+
+Thrown when the password is shorter than the allowed minimum length.
+
+### Example Error Response
+
+```json
+{
+  "error": "Login or email already exists"
+}
+```
+
+Controller behavior has been improved to return clearer error responses during signup and authentication failures.
+
+---
+
+## Security Design
+
+### Password Security
+
+* Passwords are stored using **BCrypt**
+
+### JWT Security
+
+* Access token generation now uses **`UserDetails`**
+* Roles / authorities are embedded inside the token
+* Tokens are validated by the API Gateway before request forwarding
+
+### Refresh Token Security
+
+* Refresh tokens are issued during login
+* Refresh tokens are used only with the User Service
+* Refresh tokens can be revoked on logout
+* Revoked tokens should no longer be accepted for refresh operations
+
+### Role-Based Access Control
+
+JWT payload includes authorities, enabling route-level authorization in the gateway and downstream services.
+
+Example token payload:
+
+```json
+{
+  "sub": "john",
+  "roles": ["ROLE_USER"]
+}
+```
+
+---
+
+## Configuration
+
+This service is designed to retrieve configuration from a **Config Server** in cloud environments.
+
+Typical externalized properties include:
+
+* datasource configuration
+* JWT secret
+* token expiration
+* refresh token expiration
+* service registration settings
+* server port
+
+### Test Configuration
+
+For tests, external dependencies such as Config Server should be disabled.
 
 Example:
 
 ```yaml
-- Path=/admin/**
-  Required role: ADMIN
+spring:
+  cloud:
+    config:
+      enabled: false
 ```
 
 ---
 
-## Service Isolation
+## Run Locally
 
-The User Service:
+### Prerequisites
 
-* Is **not publicly exposed**
-* Is only accessible via:
+* Java 17+
+* Maven
+* Running database
+* Config Server running if required by your environment
+* Service Discovery running if required by your environment
 
-  * API Gateway
-  * Internal network
-* Never accessed directly by browsers
+### Start the service
+
+```bash
+mvn clean spring-boot:run
+```
+
+### Run tests
+
+```bash
+mvn test
+```
+
+---
+
+## Run with Docker
+
+### Build the jar
+
+```bash
+mvn clean package
+```
+
+### Build the Docker image
+
+```bash
+docker build -t user-service:3.0 .
+```
+
+### Run the container
+
+```bash
+docker run -p 8083:8083 user-service:3.0
+```
+
+### Example with environment variables
+
+```bash
+docker run -p 8083:8083 \
+  -e SPRING_PROFILES_ACTIVE=docker \
+  -e JWT_SECRET=my-secret \
+  user-service:3.0
+```
+
+If your architecture uses external services such as Config Server, Discovery, or Database, make sure the container can reach them through the configured network.
+
+---
+
+## Testing Strategy
+
+This service includes several test layers to ensure reliability.
+
+### Repository Tests
+
+Verify:
+
+* persistence behavior
+* custom queries
+* uniqueness checks for login and email
+
+Typical annotation:
+
+```java
+@DataJpaTest
+```
+
+### Unit Tests
+
+Verify:
+
+* business rules
+* password validation
+* duplicate user checks
+* JWT-related logic at service level
+
+Typical tools:
+
+* JUnit 5
+* Mockito
+
+### Slice Tests
+
+Verify:
+
+* controller mappings
+* HTTP status codes
+* JSON request/response handling
+* validation behavior
+
+Typical annotation:
+
+```java
+@WebMvcTest
+```
+
+### Integration Tests
+
+Verify full application behavior across:
+
+```text
+Controller
+ ↓
+Service
+ ↓
+Repository
+ ↓
+Security
+```
+
+Typical annotation:
+
+```java
+@SpringBootTest
+```
+
+### Test Dependencies Added
+
+* `spring-security-test`
+* `jackson-databind`
 
 ---
 
 ## Observability
 
-The service integrates with:
+The service is designed to integrate with a cloud-native observability stack:
 
 * **OpenTelemetry**
-* **Prometheus** (metrics)
-* **Loki** (Logs)
-* **Tempo** (distributed tracing)
-* **Grafana** (dashboards)
-* **Kafka metrics & traces**
+* **Prometheus**
+* **Loki**
+* **Tempo**
+* **Grafana**
 
-This enables:
+This supports:
 
-* Authentication latency monitoring
-* Login failure tracking
-* Token issuance metrics
-* Distributed tracing
-
----
-
-## Startup Order
-
-The User Service depends on:
-
-1. Config Server
-2. Eureka Discovery
-3. Database (User & Token storage)
-
-Once started, it registers with Eureka and becomes available to the API Gateway.
+* authentication tracing
+* login latency measurement
+* refresh/logout monitoring
+* error tracking
+* health visibility
 
 ---
 
-## Why this design?
+## Version History
 
-This design:
+### v3
 
-* Centralizes authentication
-* Simplifies security management
-* Scales independently
-* Aligns with OAuth2/JWT best practices
-* Works well in microservice architectures
+* Added login and refresh token workflow
+* Added logout / token revocation support
+* Updated JWT access token generation using `UserDetails`
+* Replaced signup role type from `int` to `Role_Enum`
+* Added Builder pattern to `Users`
+* Added `LoginOrEmailExistException`
+* Improved signup validation and error handling
+* Replaced user initialization with builder-based creation
+* Added repository tests
+* Added unit tests
+* Added controller slice tests
+* Added integration tests
+* Added `spring-security-test` and `jackson-databind`
+* Added Docker support
 
-It mirrors real-world identity services used in production systems.
+### v2
+
+* Added Principe of Clean Code
+
+### v1
+
+* Initial service foundation
+* Basic JWT authentication
+* Signup flow
+* Initial role management
 
 ---
 
+## Roadmap
 
-## Summary
+* Add email verification flow
+* Add password reset flow
+* Add OAuth2 / social login
+* Add OpenAPI / Swagger documentation
+* Add CI/CD pipeline badges
+* Add production deployment manifests
 
-* Centralized user management
-* Secure JWT authentication
-* Refresh token support
-* Role-based access control
-* Gateway-integrated security
-* Scalable & observable
+---
 
+## Author
+
+**Bah Youne**
+
+Founder & Backend / Full Stack Java Developer
+
+* GitHub: [http://github.com/bahyoune]
+* LinkedIn: [http://linkedin.com/in/younoussa-bah]
+
+---
+
+## License
+
+This project is shared for educational, portfolio, and demonstration purposes unless specified otherwise.
 
 
 

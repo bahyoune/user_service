@@ -1,0 +1,36 @@
+Spring:
+  datasource:
+    driver-class-name: org.h2.Driver
+    url: jdbc:h2:mem:userdb
+    username: sa
+    password: ""
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # For HS256 demo. In prod, prefer JWK set URI / public key.
+          secret-key: MysuperSecretKeyForJWT1234567890098765432dffgdfsgfgsfgsdfgfsfgffgsfg456w5w465w4rggfg4453
+
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+
+custom:
+  msg: Good Study
+
+
+jwt:
+  access:
+    secret: MysuperSecretKeyForJWT1234567890098765432dffgdfsgfgsfgsdfgfsfgffgsfg456w5w465w4rggfg4453
+    expiration: 9000   # 15 min +
+  refresh:
+    secret: MysuperSecretKeyForJWT123456789009876hd7532dffgdfsgfgsfgsdfgfsfgffgsfg456w5w465w4rggfg4453
+    expiration: 604800  # 7 days
+  roles:
+  admin: ROLE_ADMIN
+  user: ROLE_USER

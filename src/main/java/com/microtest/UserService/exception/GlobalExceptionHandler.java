@@ -1,4 +1,4 @@
-package com.microtest.UserService.handlingError;
+package com.microtest.UserService.exception;
 
 
 import org.springframework.http.HttpStatus;

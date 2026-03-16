@@ -1,7 +1,7 @@
-package com.microtest.UserService.service.auth;
+package com.microtest.UserService.config.jwt;
 
-import com.microtest.UserService.bean.Users;
-import com.microtest.UserService.repo.UsersRepository;
+import com.microtest.UserService.entity.Users;
+import com.microtest.UserService.repository.UsersRepository;
 import lombok.AllArgsConstructor;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -28,7 +28,7 @@ public class CustomUserDetailsService implements UserDetailsService {
 
 
         return new org.springframework.security.core.userdetails.User(
-                usernameOrEmail,
+                user.getLogin(),
                 user.getPassword(),
                 authorities
         );

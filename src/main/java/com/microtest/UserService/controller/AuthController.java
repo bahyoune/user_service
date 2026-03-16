@@ -1,15 +1,13 @@
 package com.microtest.UserService.controller;
 
 
-import com.microtest.UserService.bean.Users;
 import com.microtest.UserService.config.jwt.JwtUtil;
 import com.microtest.UserService.dto.AuthentificationRequest;
-import com.microtest.UserService.dto.SignupRequest;
-import com.microtest.UserService.repo.UsersRepository;
-import com.microtest.UserService.service.auth.AuthService;
-import com.microtest.UserService.service.auth.RefreshTokenStore;
-import jakarta.servlet.http.HttpServletResponse;
-import lombok.RequiredArgsConstructor;
+import com.microtest.UserService.dto.SignUpRequest;
+import com.microtest.UserService.dto.SignupResponse;
+import com.microtest.UserService.exception.LoginOrEmailExistException;
+import com.microtest.UserService.service.AuthService;
+import com.microtest.UserService.service.RefreshTokenStore;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -25,29 +23,27 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
 import java.util.Map;
-import java.util.Optional;
 
 @RestController
 @RequestMapping("/auth")
-@RequiredArgsConstructor
 public class AuthController {
 
     //<editor-fold defaultState="collapsed" desc="javax.persistence.OneToMany">
     //</editor-fold>
 
     @Autowired
-    private final JwtUtil jwt;
+    private JwtUtil jwt;
+
     @Autowired
-    private final RefreshTokenStore store;
+    private RefreshTokenStore store;
 
     @Autowired
     private AuthService authService;
 
-    private final AuthenticationManager authenticationManager;
-    private final UserDetailsService userDetailsService;
-
     @Autowired
-    private final UsersRepository userRepository;
+    private  AuthenticationManager authenticationManager;
+    @Autowired
+    private UserDetailsService userDetailsService;
 
     @Value("${jwt.access.expiration}")
     private Long jwtAccessSeconds;
@@ -57,10 +53,9 @@ public class AuthController {
 
     // Demo authentication — replace with real user check (DB/IdP/etc.)
     @PostMapping("/login")
-    public ResponseEntity<?> login( @RequestBody AuthentificationRequest auth,
-            HttpServletResponse response)
+    public ResponseEntity<?> login(@RequestBody AuthentificationRequest auth)
             throws BadCredentialsException,
-            DisabledException, UsernameNotFoundException{
+            DisabledException, UsernameNotFoundException {
 
         try {
 
@@ -74,40 +69,31 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.NOT_ACCEPTABLE).body(Map.of("error", "Users Disable"));
         }
 
-
         final UserDetails userDetails = userDetailsService.
                 loadUserByUsername(auth.getUsername().toLowerCase());
 
-        Optional<Users> optionalUser = userRepository.findByEmailOrLogin(userDetails.getUsername(),userDetails.getUsername());
+        // issue refresh (jti tracked), then access
+        Instant refExp = Instant.now().plusSeconds(jwtRefreshSeconds);
+        String jti = store.issue(auth.getUsername(), refExp);
+        String refreshToken = jwt.generateRefreshToken(auth.getUsername(), jti);
+        String accessToken = jwt.generateAccessToken(userDetails);
 
-        if (optionalUser.isPresent()) {
-            Users user = optionalUser.get();
+        return ResponseEntity.ok(Map.of(
+                "accessToken", accessToken,
+                "refreshToken", refreshToken,
+                "tokenType", "Bearer",
+                "expiresIn", jwtAccessSeconds
+        ));
 
-            // issue refresh (jti tracked), then access
-            Instant refExp = Instant.now().plusSeconds( jwtRefreshSeconds );
-            String jti = store.issue(auth.getUsername(), refExp);
-            String refreshToken = jwt.generateRefreshToken(auth.getUsername(), jti);
-            String accessToken  = jwt.generateAccessToken(auth.getUsername(), user.getRole().toString());
-
-            return ResponseEntity.ok(Map.of(
-                    "accessToken", accessToken,
-                    "refreshToken", refreshToken,
-                    "tokenType", "Bearer",
-                    "expiresIn", jwtAccessSeconds
-            ));
-        }
-
-
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Bad Credentials"));
     }
 
     @PostMapping("/refresh")
-    public ResponseEntity<?> refresh(@RequestParam( value = "refreshToken") String refreshToken) {
+    public ResponseEntity<?> refresh(@RequestParam(value = "refreshToken") String refreshToken) {
         if (!jwt.isRefreshValid(refreshToken)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "invalid_or_expired_refresh"));
         }
         String userId = jwt.subject_refresh(refreshToken);
-        String jti  = jwt.jti(refreshToken);
+        String jti = jwt.jti(refreshToken);
 
         // Rotation: only the latest jti per userId is valid; issue a new one and invalidate the old
         if (!store.isCurrent(userId, jti, Instant.now())) {
@@ -115,28 +101,22 @@ public class AuthController {
         }
 
         // rotate
-        Instant refExp = Instant.now().plusSeconds( jwtRefreshSeconds );
+        Instant refExp = Instant.now().plusSeconds(jwtRefreshSeconds);
         String newJti = store.issue(userId, refExp);
         String newRefresh = jwt.generateRefreshToken(userId, newJti);
 
         // access token (role could be looked up again; here we reuse previous role or re-query)
         final UserDetails userDetails = userDetailsService.
                 loadUserByUsername(userId);
-        Optional<Users> optionalUser = userRepository.findByEmailOrLogin(userDetails.getUsername(),userDetails.getUsername());
 
-        if (optionalUser.isPresent()) {
-            Users user = optionalUser.get();
-            String newAccess = jwt.generateAccessToken(userId, user.getRole().toString());
+        String newAccess = jwt.generateAccessToken(userDetails);
 
-            return ResponseEntity.ok(Map.of(
-                    "accessToken", newAccess,
-                    "refreshToken", newRefresh,
-                    "tokenType", "Bearer",
-                    "expiresIn", jwtAccessSeconds
-            ));
-        }
-
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Bad Credentials"));
+        return ResponseEntity.ok(Map.of(
+                "accessToken", newAccess,
+                "refreshToken", newRefresh,
+                "tokenType", "Bearer",
+                "expiresIn", jwtAccessSeconds
+        ));
     }
 
     @PostMapping("/logout")
@@ -146,15 +126,18 @@ public class AuthController {
     }
 
     @PostMapping("/signup")
-    public ResponseEntity<?> signupAdmin(
-            @RequestBody(required = true) SignupRequest dto) {
+    public ResponseEntity<?> signup(
+            @RequestBody(required = true) SignUpRequest dto) {
 
-        SignupRequest res = authService.createUser(dto);
-        if (res != null)
-            return ResponseEntity.ok(res);
+        try {
+            SignupResponse res = authService.createUser(dto);
+            return ResponseEntity.status(HttpStatus.CREATED).body(res);
+        } catch (LoginOrEmailExistException ex) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(ex.getMessage());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.LENGTH_REQUIRED).body(e.getMessage());
+        }
 
-        return ResponseEntity.badRequest()
-                .body("Error: Username is already taken!") ;
     }
 
 

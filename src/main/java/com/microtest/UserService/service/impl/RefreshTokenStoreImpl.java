@@ -1,19 +1,21 @@
-package com.microtest.UserService.service.auth;
+package com.microtest.UserService.service.impl;
 
-import org.springframework.stereotype.Repository;
+import com.microtest.UserService.service.RefreshTokenStore;
+import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-@Repository
-public class RefreshTokenStore {
+@Service
+public class RefreshTokenStoreImpl implements RefreshTokenStore {
 
     // user -> current valid refresh token id (jti) and expiry
     private final Map<String, Entry> active = new ConcurrentHashMap<>();
 
-    public static record Entry(String jti, Instant expiresAt) {}
+    public record Entry(String jti, Instant expiresAt) {
+    }
 
     public String issue(String userId, Instant expiresAt) {
         String jti = UUID.randomUUID().toString();

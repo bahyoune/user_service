@@ -1,14 +1,16 @@
-package com.microtest.UserService.bean;
+package com.microtest.UserService.entity;
 
 import com.microtest.UserService.enums.ROLE_ENUM;
 import jakarta.persistence.*;
-import lombok.Builder;
-import lombok.Data;
+import lombok.*;
 
 import java.util.Date;
 
-@Data
-//@Builder
+@Getter
+@Setter
+@AllArgsConstructor
+@NoArgsConstructor
+@Builder
 @Entity
 @Table(name = "USERS")
 public class Users {
@@ -27,7 +29,7 @@ public class Users {
     @Column(nullable = false)
     private String password;
 
-    @Column(nullable = false)
+    @Enumerated(EnumType.STRING)
     private ROLE_ENUM role;
 
     @Column(nullable = false)
@@ -39,11 +41,5 @@ public class Users {
     @Temporal(TemporalType.TIMESTAMP)
     private Date d0;
 
-    public Users() {
-    }
-
-    public Users(Long id) {
-        this.id = id;
-    }
 
 }

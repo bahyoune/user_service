@@ -1,4 +1,4 @@
-package com.microtest.UserService.handlingError;
+package com.microtest.UserService.exception;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
